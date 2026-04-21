@@ -1,0 +1,36 @@
+name: Sentinelle ISS — Passages 24/7
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # toutes les heures, 24h/24
+  workflow_dispatch:        # permet aussi de lancer manuellement
+
+jobs:
+  check-iss:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install skyfield requests
+
+      - name: Run ISS Monitor
+        env:
+          GMAIL_USER:     ${{ secrets.GMAIL_USER }}
+          GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
+          DESTINATAIRE:   ${{ secrets.DESTINATAIRE }}
+        run: python iss_monitor.py
+
+      - name: Sauvegarder la mémoire ISS
+        uses: actions/upload-artifact@v4
+        with:
+          name: iss-memoire
+          path: iss_db.txt
+          retention-days: 30
+          overwrite: true
