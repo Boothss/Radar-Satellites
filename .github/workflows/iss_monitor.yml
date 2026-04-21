@@ -18,7 +18,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install skyfield requests
+        run: pip install skyfield requests pytz
 
       - name: Run ISS Monitor
         env:
