@@ -142,9 +142,10 @@ def envoyer_email(passages_nouveaux):
     msg = MIMEMultipart("alternative")
 
     p = passages_nouveaux[0]
-    heure_str = p["culmination"].strftime("%H:%M")
-    msg["Subject"] = f"🛰️ ISS visible à {heure_str} au-dessus de {MA_VILLE}"
-    msg["From"]    = GMAIL_USER
+    heure_str   = p["culmination"].strftime("%H:%M")
+    date_str    = p["culmination"].strftime("%A %d %B").upper()
+    msg["Subject"] = f"⚠️ ALERTE ORBITALE : ISS Visibilité Confirmée - {date_str} à {heure_str}"
+    msg["From"]    = f"NASA Mission Control Centre <{GMAIL_USER}>"
     msg["To"]      = DESTINATAIRE
 
     # ── TEXTE PLAIN ──
@@ -171,141 +172,160 @@ def envoyer_email(passages_nouveaux):
     plain_lines.append("\nSource : CelesTrak TLE · Calculs Skyfield")
     plain_text = "\n".join(plain_lines)
 
-    # ── HTML ──
-    cards_html = ""
+    # ── HTML — Style NASA Mission Control (design original) ──
+    now_str  = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H%M")
+
+    rows_html = ""
     for p in passages_nouveaux:
-        alt_max  = p.get("altitude_max", 0)
-        qualite, qualite_color = evaluer_qualite(alt_max)
-        direction = p.get("direction", "—")
-        dist_km   = int(p.get("distance_km", 0))
+        alt_max       = p.get("altitude_max", 0)
+        qualite, _    = evaluer_qualite(alt_max)
+        direction     = p.get("direction", "—")
+        dist_km       = int(p.get("distance_km", 0))
+        heure_exacte  = p["culmination"].strftime("%H:%M")
+        date_texte    = p["culmination"].strftime("%A %d %B %Y").upper()
+        heure_lever   = p["lever"].strftime("%H:%M:%S")   if "lever"   in p else "—"
+        heure_coucher = p["coucher"].strftime("%H:%M:%S") if "coucher" in p else "—"
 
-        heure_culmination = p["culmination"].strftime("%H:%M:%S")
-        date_passage      = p["culmination"].strftime("%A %d %B %Y").capitalize()
-        heure_lever       = p["lever"].strftime("%H:%M:%S")   if "lever"   in p else "—"
-        heure_coucher     = p["coucher"].strftime("%H:%M:%S") if "coucher" in p else "—"
+        rows_html += f"""
+        <!-- SÉPARATEUR ENTRE PASSAGES -->
+        <tr><td colspan="2" style="padding:0;height:8px;background:#f1f1f1;"></td></tr>
+        <tr style="background-color:#e8f0fe;">
+          <td colspan="2" style="padding:10px 12px;font-size:13px;
+              color:#0B3D91;font-weight:bold;border:1px solid #d1d1d1;">
+            🛰️ PASSAGE #{passages_nouveaux.index(p)+1} sur {len(passages_nouveaux)}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:12px;border:1px solid #d1d1d1;">
+            <strong>Identifiant de la Cible</strong>
+          </td>
+          <td style="padding:12px;border:1px solid #d1d1d1;">
+            ISS (ZARYA) // NORAD ID 25544
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:12px;border:1px solid #d1d1d1;">
+            <strong>Coordonnées d'Observation</strong>
+          </td>
+          <td style="padding:12px;border:1px solid #d1d1d1;">
+            LAT {MA_LATITUDE} | LON {MA_LONGITUDE} (Base de Calais)
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:12px;border:1px solid #d1d1d1;">
+            <strong>Date du Phénomène</strong>
+          </td>
+          <td style="padding:12px;border:1px solid #d1d1d1;">{date_texte}</td>
+        </tr>
+        <tr style="background-color:#FFF5F5;">
+          <td style="padding:15px;border:1px solid #FC3D21;color:#FC3D21;">
+            <strong>⚡ HEURE CRITIQUE D'INTERCEPTION</strong>
+          </td>
+          <td style="padding:15px;border:1px solid #FC3D21;color:#FC3D21;
+              font-weight:bold;font-size:20px;">
+            {heure_exacte} (HEURE LOCALE)
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:12px;border:1px solid #d1d1d1;">
+            <strong>Altitude Maximale</strong>
+          </td>
+          <td style="padding:12px;border:1px solid #d1d1d1;font-weight:bold;">
+            {alt_max}° — {qualite}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:12px;border:1px solid #d1d1d1;">
+            <strong>Direction d'Observation</strong>
+          </td>
+          <td style="padding:12px;border:1px solid #d1d1d1;">{direction}</td>
+        </tr>
+        <tr>
+          <td style="padding:12px;border:1px solid #d1d1d1;">
+            <strong>Distance ISS</strong>
+          </td>
+          <td style="padding:12px;border:1px solid #d1d1d1;font-family:monospace;">
+            {dist_km:,} km
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:12px;border:1px solid #d1d1d1;">
+            <strong>Fenêtre d'Observation</strong>
+          </td>
+          <td style="padding:12px;border:1px solid #d1d1d1;font-family:monospace;">
+            {heure_lever} → {heure_coucher}
+          </td>
+        </tr>"""
 
-        # Barre d'altitude visuelle
-        alt_pct = min(100, int((alt_max / 90) * 100))
+    html_body = f"""
+    <!DOCTYPE html>
+    <html>
+    <body style="background-color:#ffffff;color:#333333;
+                 font-family:Arial,Helvetica,sans-serif;padding:20px;font-size:16px;">
 
-        cards_html += f"""
-        <div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.3);
-                    border-left:4px solid #3B82F6;border-radius:10px;
-                    padding:20px 24px;margin-bottom:20px;">
+      <div style="border:1px solid #d1d1d1;padding:0;max-width:650px;margin:auto;
+                  background-color:#ffffff;box-shadow:0 4px 10px rgba(0,0,0,0.1);">
 
-          <div style="font-size:10px;font-family:monospace;color:#3B82F6;
-                      letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;">
-            🛰️ PASSAGE ISS · {MA_VILLE.upper()}
-          </div>
+        <!-- HEADER NASA -->
+        <div style="background-color:#0B3D91;color:#ffffff;padding:20px;
+                    text-align:center;border-bottom:4px solid #FC3D21;">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/NASA_logo.svg/100px-NASA_logo.svg.png"
+               alt="NASA Logo" style="width:80px;margin-bottom:10px;">
+          <h1 style="color:#ffffff;margin:0;text-transform:uppercase;
+                     letter-spacing:1px;font-size:22px;">
+            National Aeronautics and Space Administration
+          </h1>
+          <p style="margin:5px 0 0 0;color:#e1e1e1;font-weight:bold;">
+            Mission Control Centre // Orbital Event Notification
+          </p>
+        </div>
 
-          <div style="font-size:22px;font-weight:700;color:#FFFFFF;margin-bottom:4px;">
-            {heure_culmination}
-          </div>
-          <div style="font-size:13px;color:#64748B;font-family:monospace;margin-bottom:20px;">
-            {date_passage}
-          </div>
+        <!-- CORPS -->
+        <div style="padding:30px;">
+          <h2 style="color:#0B3D91;border-bottom:2px solid #0B3D91;
+                     padding-bottom:10px;margin-top:0;">
+            Alerte d'Observation Orbitale N° {now_str}
+          </h2>
 
-          <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
-            <tr>
-              <td style="padding:6px 12px 6px 0;font-size:11px;color:#64748B;
-                         font-family:monospace;white-space:nowrap;">ALTITUDE MAX</td>
-              <td style="padding:6px 0;font-size:20px;font-weight:700;color:#3B82F6;">
-                {alt_max}°
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:6px 12px 6px 0;font-size:11px;color:#64748B;
-                         font-family:monospace;">DIRECTION</td>
-              <td style="padding:6px 0;font-size:13px;color:#E2E8F0;">{direction}</td>
-            </tr>
-            <tr>
-              <td style="padding:6px 12px 6px 0;font-size:11px;color:#64748B;
-                         font-family:monospace;">DISTANCE</td>
-              <td style="padding:6px 0;font-size:13px;color:#E2E8F0;font-family:monospace;">
-                {dist_km:,} km
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:6px 12px 6px 0;font-size:11px;color:#64748B;
-                         font-family:monospace;">LEVER → COUCHER</td>
-              <td style="padding:6px 0;font-size:13px;color:#E2E8F0;font-family:monospace;">
-                {heure_lever} → {heure_coucher}
-              </td>
-            </tr>
+          <p><strong>ATTENTION OBSERVATION OFFICER BAILLY.</strong></p>
+          <p style="line-height:1.6;">
+            Le département de Télémétrie et de Suivi Spatial a confirmé
+            <strong>{len(passages_nouveaux)} opportunité(s)</strong> d'observation visuelle
+            de la Station Spatiale Internationale au-dessus de vos coordonnées actuelles
+            (Base d'Observation de Calais).
+          </p>
+
+          <table style="width:100%;border-collapse:collapse;margin-top:25px;
+                        margin-bottom:25px;border:1px solid #d1d1d1;">
+            <thead style="background-color:#f1f1f1;">
+              <tr>
+                <th style="padding:12px;text-align:left;border:1px solid #d1d1d1;
+                            color:#0B3D91;">Paramètre</th>
+                <th style="padding:12px;text-align:left;border:1px solid #d1d1d1;
+                            color:#0B3D91;">Donnée</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows_html}
+            </tbody>
           </table>
 
-          <!-- Barre altitude -->
-          <div style="margin-bottom:12px;">
-            <div style="font-size:10px;font-family:monospace;color:#64748B;margin-bottom:6px;">
-              ALTITUDE ({alt_max}° / 90° MAX)
-            </div>
-            <div style="height:4px;background:#0F1E38;border-radius:2px;overflow:hidden;">
-              <div style="height:4px;width:{alt_pct}%;background:linear-gradient(90deg,#3B82F6,#60A5FA);
-                          border-radius:2px;"></div>
-            </div>
-          </div>
+          <h3 style="color:#0B3D91;margin-top:25px;">Directives d'Observation :</h3>
+          <ul style="line-height:1.6;color:#555555;padding-left:20px;">
+            <li><strong>Météo :</strong> Vérifiez les conditions de couverture nuageuse
+                locale avant déploiement.</li>
+            <li><strong>Visibilité :</strong> La cible apparaîtra comme un point lumineux
+                non clignotant, traversant le ciel de façon constante.</li>
+            <li><strong>Préparation :</strong> L'élévation de {ALTITUDE_MIN}° garantit
+                une réflectivité solaire maximale pour une observation à l'œil nu.</li>
+          </ul>
 
-          <!-- Badge qualité -->
-          <div style="display:inline-block;padding:5px 14px;border-radius:6px;
-                      background:{qualite_color}20;border:1px solid {qualite_color}50;
-                      font-size:12px;font-family:monospace;color:{qualite_color};">
-            {qualite}
-          </div>
-
-          <!-- Conseils observation -->
-          <div style="margin-top:14px;padding:12px 14px;background:#050810;
-                      border-radius:8px;font-size:12px;color:#94A3B8;line-height:1.7;">
-            💡 <strong style="color:#CBD5E1;">Conseil :</strong>
-            Regardez vers le <strong style="color:#FFFFFF;">{direction}</strong>.
-            L'ISS ressemble à une étoile très brillante qui se déplace rapidement sans clignoter.
-            Magnitude estimée entre -2 et -4 (plus brillant que Jupiter).
-          </div>
-        </div>"""
-
-    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    html_body = f"""
-    <html>
-    <body style="margin:0;padding:0;background:#050810;">
-      <div style="max-width:620px;margin:0 auto;padding:32px 24px;
-                  font-family:'Segoe UI',Arial,sans-serif;">
-
-        <!-- HEADER -->
-        <div style="display:flex;align-items:center;gap:14px;margin-bottom:28px;
-                    padding-bottom:20px;border-bottom:1px solid #0F1E38;">
-          <div style="background:linear-gradient(135deg,#1E3A8A,#3B82F6);
-                      border-radius:12px;width:48px;height:48px;
-                      display:flex;align-items:center;justify-content:center;
-                      font-size:24px;flex-shrink:0;">🛰️</div>
-          <div>
-            <div style="color:#FFFFFF;font-size:20px;font-weight:700;
-                        letter-spacing:.15em;">SENTINELLE ISS</div>
-            <div style="color:#4A6FA5;font-size:10px;letter-spacing:.1em;margin-top:2px;">
-              TRACKER STATION SPATIALE INTERNATIONALE · {MA_VILLE.upper()}
-            </div>
-          </div>
+          <p style="text-align:center;margin-top:40px;color:#888888;font-size:13px;
+                    border-top:1px solid #d1d1d1;padding-top:20px;">
+            Ceci est une transmission automatisée générée par Sentinelle Python v2.1.<br>
+            © National Aeronautics and Space Administration.
+          </p>
         </div>
-
-        <!-- BANNER -->
-        <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.3);
-                    border-radius:10px;padding:14px 20px;margin-bottom:24px;">
-          <div style="font-size:13px;font-family:monospace;color:#60A5FA;
-                      letter-spacing:.08em;">
-            ● {len(passages_nouveaux)} PASSAGE(S) PRÉVU(S) · {now_str}
-          </div>
-        </div>
-
-        <!-- CARDS -->
-        {cards_html}
-
-        <!-- FOOTER -->
-        <div style="margin-top:28px;padding-top:20px;border-top:1px solid #0F1E38;
-                    font-size:11px;color:#374151;font-family:monospace;line-height:1.8;">
-          <div>Source : CelesTrak TLE · Calculs Skyfield Python</div>
-          <div>Vérification automatique toutes les heures via GitHub Actions</div>
-          <div style="margin-top:6px;color:#1E3A5F;">
-            Position configurée : {MA_LATITUDE}°N {MA_LONGITUDE}°E · {MA_VILLE}
-          </div>
-        </div>
-
       </div>
     </body>
     </html>"""
