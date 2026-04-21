@@ -29,7 +29,7 @@ MA_LONGITUDE = 1.8842
 MA_VILLE     = "Calais / Dunkerque"
 
 # Seuil d'altitude minimum pour un beau passage (degrés)
-ALTITUDE_MIN = 30.0
+ALTITUDE_MIN = 10.0
 
 # Fenêtre de recherche (heures)
 FENETRE_HEURES = 12
