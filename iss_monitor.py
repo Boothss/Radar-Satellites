@@ -5,12 +5,16 @@ Envoie un email si l'ISS passe au-dessus de Calais dans les prochaines 12h.
 """
 
 import smtplib
+import pytz
 import os
 import requests
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from skyfield.api import load, wgs84
 from datetime import datetime, timedelta, timezone
+
+# Fuseau horaire France
+FUSEAU_FRANCE = pytz.timezone("Europe/Paris")
 
 # ==========================================
 # ⚙️  CONFIG (via secrets GitHub)
@@ -77,7 +81,7 @@ def trouver_passages():
 
         for time_ev, event in zip(t, events):
             heure_utc   = time_ev.utc_datetime()
-            heure_locale = heure_utc.astimezone()
+            heure_locale = heure_utc.replace(tzinfo=pytz.utc).astimezone(FUSEAU_FRANCE)
 
             if event == 0:  # Lever
                 passage_courant = {"lever": heure_locale}
